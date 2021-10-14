@@ -140,6 +140,7 @@ static NSDictionary<NSString *, id> *RNCPositionError(RNCPositionErrorCode code,
   BOOL _usingSignificantChanges;
   RNCGeolocationConfiguration _locationConfiguration;
   RNCGeolocationOptions _observerOptions;
+  NSTimer *_locationeventTimer;
 }
 
 RCT_EXPORT_MODULE()
@@ -151,7 +152,10 @@ RCT_EXPORT_MODULE()
   _usingSignificantChanges ?
   [_locationManager stopMonitoringSignificantLocationChanges] :
   [_locationManager stopUpdatingLocation];
-
+  if ([_locationeventTimer isValid]) {
+      [_locationeventTimer invalidate];
+  }
+  _locationeventTimer = nil;
   _locationManager.delegate = nil;
 }
 
@@ -178,6 +182,10 @@ RCT_EXPORT_MODULE()
     _locationManager.delegate = self;
   }
 
+    if(!_locationeventTimer) {
+        _locationeventTimer = [NSTimer scheduledTimerWithTimeInterval:1.0f
+        target:self selector:@selector(locationtimer:) userInfo:nil repeats:YES];
+    }
   _locationManager.distanceFilter  = distanceFilter;
   _locationManager.desiredAccuracy = desiredAccuracy;
   _usingSignificantChanges = useSignificantChanges;
@@ -206,6 +214,12 @@ RCT_EXPORT_MODULE()
     [_locationManager stopMonitoringSignificantLocationChanges] :
     [_locationManager stopUpdatingLocation];
   }
+}
+
+-(void)locationtimer:(NSTimer *)timer{
+    if (_observingLocation) {
+      [self sendEventWithName:@"geolocationDidChange" body:_lastLocationEvent];
+    }
 }
 
 #pragma mark - Public API
@@ -367,9 +381,9 @@ RCT_EXPORT_METHOD(getCurrentPosition:(RNCGeolocationOptions)options
                          };
 
   // Send event
-  if (_observingLocation) {
-    [self sendEventWithName:@"geolocationDidChange" body:_lastLocationEvent];
-  }
+//  if (_observingLocation) {
+//    [self sendEventWithName:@"geolocationDidChange" body:_lastLocationEvent];
+//  }
 
   // Fire all queued callbacks
   for (RNCGeolocationRequest *request in _pendingRequests) {
@@ -388,6 +402,7 @@ RCT_EXPORT_METHOD(getCurrentPosition:(RNCGeolocationOptions)options
 
 }
 
+
 -(void)locationManager:(CLLocationManager *)manager didUpdateHeading:(CLHeading *)newHeading{
     // Create event
     CLLocation *location = manager.location;
@@ -405,9 +420,9 @@ RCT_EXPORT_METHOD(getCurrentPosition:(RNCGeolocationOptions)options
                            };
 
     // Send event
-    if (_observingLocation) {
-      [self sendEventWithName:@"geolocationDidChange" body:_lastLocationEvent];
-    }
+//    if (_observingLocation) {
+//      [self sendEventWithName:@"geolocationDidChange" body:_lastLocationEvent];
+//    }
 
     // Fire all queued callbacks
     for (RNCGeolocationRequest *request in _pendingRequests) {
